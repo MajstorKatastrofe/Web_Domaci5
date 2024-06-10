@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Public Blog</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css"
+          integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous">
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <a class="navbar-brand" href="#">Public Blog</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav mr-auto">
+            <li class="nav-item">
+                <a class="nav-link" href="#" id="posts-link">Posts</a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+
+<div class="container" id="container">
+    <br>
+    <div id="content">
+        <!-- Ovde će biti dinamički prikazan sadržaj -->
+    </div>
+</div>
+
+
+<script>
+
+
+    document.getElementById("posts-link").addEventListener("click", function(event) {
+        event.preventDefault();
+        loadPosts();
+        const commentName = document.getElementById("comment-name").value;
+        const commentText = document.getElementById("comment-text").value;
+        addComment(post, commentName, commentText);
+    });
+
+    function loadPosts() {
+        fetch('/api/posts', {
+            method: 'GET'
+        }).then(response => {
+            return response.json();
+        }).then(posts => {
+            if (posts.length === 0) {
+                const content = document.getElementById('content');
+                content.innerHTML = ''; // da ocisti element BITNO!!
+
+                const noPostsMessage = document.createElement('p');
+
+                noPostsMessage.innerText = "There aren't any posts at this time.";
+                content.appendChild(noPostsMessage);
+
+                const button = document.createElement("div");
+                button.innerHTML = `
+                <div class="container">
+                    <br>
+                    <br>
+                    <button type="submit" class="btn btn-primary" id="new-post-button">New post</button>
+                </div>`
+
+                const con = document.getElementById("container");
+                con.appendChild(button);
+                content.appendChild(button);
+
+                document.getElementById("new-post-button").addEventListener("click", function(event) {
+                    event.preventDefault();
+                    loadNewPostForm();
+                });
+
+            } else {
+                let content = document.getElementById('content');
+                content.innerHTML = ''; // Praznimo prethodni sadržaj
+
+                for (const post of posts) {
+                    // Formatiranje vremena objavljivanja
+
+                    const publishedAt = new Date(post.published_at).toLocaleString();
+                    // Dodavanje vremena objavljivanja u objekat posta
+                    post.published_at = publishedAt;
+
+                    // Prikazivanje posta na stranici
+                    addPostElements(post);
+                }
+
+                const button = document.createElement("div");
+                button.innerHTML = `
+                <div class="container">
+                    <br>
+                    <br>
+                    <button type="submit" class="btn btn-primary" id="new-post-button">New post</button>
+                </div>`
+                content.appendChild(button);
+
+                document.getElementById("new-post-button").addEventListener("click", function(event) {
+                    event.preventDefault();
+                    loadNewPostForm();
+                });
+            }
+        });
+    }
+
+    function addPostElements(post) {
+        const content = document.getElementById('content');
+
+        const postDiv = document.createElement('div');
+
+        postDiv.innerHTML = `
+        <div class="card">
+        <div class="card-body" id="card">
+        <h2 id="post-title-${post.id}">${post.title}${post.time}</h2>
+        <p>${post.content}</p>
+        </div>
+        </div>
+    `;
+
+        postDiv.addEventListener('click', function() {
+            showPostDetails(post)
+        });
+
+        content.appendChild(postDiv);
+    }
+
+
+    function loadNewPostForm() {
+        let content = document.getElementById('content');
+        content.innerHTML = `
+            <h2>New Post</h2>
+            <form id="new-post-form">
+                <div class="form-group">
+                    <label for="post-author">Author</label>
+                    <input type="text" class="form-control" id="post-author" placeholder="Enter author">
+                </div>
+                <div class="form-group">
+                    <label for="post-title">Title</label>
+                    <input type="text" class="form-control" id="post-title" placeholder="Enter title">
+                </div>
+                <div class="form-group">
+                    <label for="post-content">Content</label>
+                    <textarea class="form-control" id="post-content" rows="5"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+        `;
+
+        document.getElementById("new-post-form").addEventListener("submit", function(event) {
+            event.preventDefault();
+            let author = document.getElementById("post-author").value;
+            let title = document.getElementById("post-title").value;
+            let content = document.getElementById("post-content").value;
+            createNewPost(title, content, author);
+        });
+    }
+
+    function updateComments(postId) {
+        const commentsList = document.getElementById(`comments-list-${postId}`);
+        fetch(`/api/posts/${postId}`)
+            .then(response => response.json())
+            .then(post => {
+                commentsList.innerHTML = '';
+                post.comments.forEach(comment => {
+                    commentsList.innerHTML += `<p>${comment.name}: ${comment.text}</p>`;
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching comments:', error);
+            });
+    }
+    function showPostDetails(post) {
+        const postId = post.id;
+        fetch(`/api/posts/${postId}`)
+            .then(response => response.json())
+            .then(post => {
+                const postDiv = document.getElementById(`content`);
+                postDiv.innerHTML = `
+            <h2>${post.title}</h2>
+            <h8>${post.time}</h8>
+            <h4>${post.author}</h4>
+            <p>${post.content}</p>
+            <div id="comments-form-${postId}">
+                <h3>Comments</h3>
+                <div id="comments-list-${postId}">
+                    <!-- Ovde će se dinamički prikazati postojeći komentari -->
+                </div>
+                <form id="new-comment-form-${postId}">
+                    <div class="form-group">
+                        <label for="comment-name">Name:</label>
+                        <input type="text" class="form-control" id="comment-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="comment-text">Comment:</label>
+                        <input type="text" class="form-control" id="comment-text" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Comment</button>
+                </form>
+            </div>
+        `;
+
+                // Dodavanje event listenera samo na dugme "Comment"
+                const commentButton = document.getElementById(`new-comment-form-${postId}`);
+                commentButton.addEventListener('submit', function(event) {
+                    event.preventDefault();
+                    const commentName = document.getElementById(`comment-name`).value;
+                    const commentText = document.getElementById(`comment-text`).value;
+                    addComment(post, commentName, commentText);
+                });
+
+                // Učitavanje i prikaz komentara
+                updateComments(postId);
+            })
+            .catch(error => {
+                console.error('Error fetching post details:', error);
+            });
+    }
+
+    function addComment(post, commentName, commentText) {
+        const postId = post.id;
+        fetch(`/api/posts/${postId}/comments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: commentName,
+                text: commentText
+            })
+        })
+            .then(response => response.json())
+            .then(comment => {
+                // Prikaz novog komentara
+                const commentsList = document.getElementById(`comments-list-${postId}`);
+                commentsList.innerHTML += `<p>${comment.name}: ${comment.text}</p>`;
+                // Resetovanje forme za komentar
+                const commentForm = document.getElementById(`new-comment-form-${postId}`);
+                commentForm.reset();
+            })
+            .catch(error => {
+                console.error('Error adding comment:', error);
+            });
+        showPostDetails(post);
+    }
+
+
+    function createNewPost(title, content, author) {
+        fetch('/api/posts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                author: author,
+                title: title,
+                content: content
+            })
+        }).then(response => {
+            return response.json();
+        }).then(post => {
+            loadPosts(); // Ponovo učitavamo listu postova nakon dodavanja novog posta
+        });
+    }
+
+    // Odmah prilikom učitavanja stranice prikažemo listu postova
+    loadPosts();
+</script>
+
+</body>
+</html>
